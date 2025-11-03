@@ -1,46 +1,72 @@
 import pytest
-from piece import Piece
-from user import User
 from set import Set
+from piece import Piece
 
-@pytest.fixture
-def sample_user():
-    """Create a sample user with a few pieces in inventory."""
-    p1 = Piece("3023", "blue", 4)
-    p2 = Piece("4286", "red", 2)
-    inventory = [p1, p2]
-    return User(user_id=1, username="brickfan35", brick_count=6, inventory=inventory)
+class MockUser:
+    def __init__(self, inventory):
+        # inventory is a dict of Piece -> quantity
+        self.inventory = inventory
 
-@pytest.fixture
-def sample_set():
-    """Create a sample LEGO set with required pieces."""
-    r1 = Piece("3023", "blue", 4)
-    r2 = Piece("4286", "red", 2)
-    required = [r1, r2]
-    return Set(set_id=1001, name="tropical-island", total_pieces=6, required_pieces=required)
+def test_can_build_true_when_user_has_all_pieces():
+    """User has all required pieces in sufficient quantities."""
+    pieces_needed = {
+        Piece("3023", "blue"): 2,
+        Piece("4286", "red"): 1,
+    }
+    set_obj = Set(101, "Mini Car", 3, pieces_needed)
 
-@pytest.fixture
-def partial_set():
-    """Create a set that requires more pieces than the user has."""
-    r1 = Piece("3023", "blue", 5)
-    r2 = Piece("4286", "red", 2)
-    required = [r1, r2]
-    return Set(set_id=1002, name="desert-house", total_pieces=7, required_pieces=required)
+    user_inventory = {
+        Piece("3023", "blue"): 3,  # has more than needed
+        Piece("4286", "red"): 1,
+        Piece("3001", "green"): 5,  # irrelevant extra piece
+    }
+    user = MockUser(user_inventory)
 
-def test_get_required_pieces_summary(sample_set):
-    summary = sample_set.get_required_pieces_summary()
-    expected = {("3023", "blue"): 4, ("4286", "red"): 2}
-    assert summary == expected, f"Expected {expected}, got {summary}"
+    assert set_obj.can_build(user) is True
 
-def test_can_build_true(sample_user, sample_set):
-    assert sample_set.can_build(sample_user) is True, "User should be able to build this set."
+def test_can_build_false_when_missing_piece():
+    """User missing one required piece."""
+    pieces_needed = {
+        Piece("3023", "blue"): 2,
+        Piece("4286", "red"): 1,
+    }
+    set_obj = Set(101, "Mini Car", 3, pieces_needed)
 
-def test_can_build_false(sample_user, partial_set):
-    assert partial_set.can_build(sample_user) is False, "User should NOT be able to build this set."
+    user_inventory = {
+        Piece("3023", "blue"): 2,
+        # Missing the red one
+    }
+    user = MockUser(user_inventory)
 
-def test_can_build_with_empty_user_inventory():
-    """Edge case: user with no pieces"""
-    empty_user = User(user_id=2, username="empty", brick_count=0, inventory=[])
-    required_piece = Piece("3023", "blue", 1)
-    s = Set(set_id=1003, name="mini-build", total_pieces=1, required_pieces=[required_piece])
-    assert s.can_build(empty_user) is False, "Empty user cannot build any set."
+    assert set_obj.can_build(user) is False
+
+def test_can_build_false_when_not_enough_quantity():
+    """User has the piece but not enough quantity."""
+    pieces_needed = {
+        Piece("3023", "blue"): 4,
+        Piece("4286", "red"): 2,
+    }
+    set_obj = Set(101, "Mini Car", 6, pieces_needed)
+
+    user_inventory = {
+        Piece("3023", "blue"): 3,  # less than needed
+        Piece("4286", "red"): 2,
+    }
+    user = MockUser(user_inventory)
+
+    assert set_obj.can_build(user) is False
+
+def test_can_build_true_with_empty_required_pieces():
+    """If no pieces are required, user should always be able to build."""
+    set_obj = Set(102, "Empty Set", 0, {})
+    user = MockUser({})  # Empty inventory
+    assert set_obj.can_build(user) is True
+
+def test_can_build_false_with_empty_user_inventory():
+    """User cannot build if they have no pieces but the set requires some."""
+    pieces_needed = {
+        Piece("3023", "blue"): 1,
+    }
+    set_obj = Set(103, "Simple Build", 1, pieces_needed)
+    user = MockUser({})
+    assert set_obj.can_build(user) is False

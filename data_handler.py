@@ -34,14 +34,13 @@ class ApiDataHandler:
         all_users = []
         for u in users_list['Users']:
             user_data = self._get_json(f"/api/user/by-id/{u['id']}")
-            pieces = []
-
+            
+            pieces_dict = {}
             for p in user_data['collection']:
                 for v in p['variants']:
-                    pieces.append(Piece(p['pieceId'], v['color'], v['count']))
+                    pieces_dict[Piece(p['pieceId'], v['color'])] = v['count']
 
-            all_users.append(User(u['id'], u['username'], u['brickCount'], pieces))
-
+            all_users.append(User(u['id'], u['username'], u['brickCount'], pieces_dict))
         return all_users
 
     def get_user_by_username(self, username: str) -> User:
@@ -49,11 +48,11 @@ class ApiDataHandler:
         user_id = data['id']
         brick_count = data['brickCount']
         user_data = self._get_json(f"/api/user/by-id/{user_id}")
-        inventory = []
-
+        
+        inventory = {}
         for p in user_data['collection']:
             for v in p['variants']:
-                inventory.append(Piece(p['pieceId'], v['color'], v['count']))
+                inventory[Piece(p['pieceId'], v['color'])] = v['count']
         return User(user_id, username, brick_count, inventory)
 
     def get_all_sets(self) -> list[Set]:
@@ -61,10 +60,10 @@ class ApiDataHandler:
         all_sets = []
         for s in sets_list['Sets']:
             set_data = self._get_json(f"/api/set/by-id/{s['id']}")
-            pieces = []
-
+            
+            pieces = {}
             for p in set_data['pieces']:
-                pieces.append(Piece(p['part']['designID'], p['part']['material'], p['quantity']))
+                pieces[Piece(p['part']['designID'], p['part']['material'])] = p['quantity']
 
             all_sets.append(Set(set_data['id'], set_data["name"], set_data['totalPieces'], pieces))
 
@@ -74,9 +73,9 @@ class ApiDataHandler:
         set_summary = self._get_json(f"/api/set/by-name/{set_name}")
         set_id = set_summary['id']
         set_full = self._get_json(f"/api/set/by-id/{set_id}")
-        required_pieces = []
 
+        required_pieces = {}
         for p in set_full['pieces']:
-            required_pieces.append(Piece(p['part']['designID'], p['part']['material'], p['quantity']))
+            required_pieces[Piece(p['part']['designID'], p['part']['material'])] = p['quantity']
 
         return Set(set_summary['id'], set_name, set_summary['totalPieces'], required_pieces)

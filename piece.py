@@ -1,8 +1,13 @@
 class Piece:
-    def __init__(self, piece_id: str, color_id: str, count: int):
+    def __init__(self, piece_id: str, color_id: str):
         self.piece_id = str(piece_id)
         self.color_id = str(color_id)
-        self.count = count
+
+    def __eq__(self, other):
+        return (self.piece_id, self.color_id) == (other.piece_id, other.color_id)
+
+    def __hash__(self):
+        return hash((self.piece_id, self.color_id))
 
     def __repr__(self):
-        return f"Piece(id={self.piece_id}, color={self.color_id}, count={self.count})"
+        return f"Piece({self.piece_id}, {self.color_id})"
