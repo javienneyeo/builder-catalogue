@@ -15,3 +15,53 @@ class Set:
             if user.inventory.get(piece, 0) < quantity:
                 return False
         return True
+    
+    def required_pieces_without_color(self):
+        pieces_without_color = {}
+        for piece, quantity in self.required_pieces.items():
+            piece_id = piece.piece_id
+            pieces_without_color[piece_id] = pieces_without_color.get(piece_id, 0) + quantity
+        return pieces_without_color
+    
+    @staticmethod
+    def has_unique_color_assignment(piece_colors, used_colors=None):
+        if used_colors is None:
+            used_colors = set()
+
+        if not piece_colors:
+            return True
+
+        piece_id, colors = next(iter(piece_colors.items()))
+
+        for color in colors:
+            if color not in used_colors:
+                new_used = used_colors | {color}
+                remaining = {k: v for k, v in piece_colors.items() if k != piece_id}
+                if Set.has_unique_color_assignment(remaining, new_used):
+                    return True
+
+        return False
+
+    def is_buildable_any_color(self, user_inventory):
+        required_pieces_dict = {}
+        user_inventory_dict = {}
+
+        for u_piece, quantity in user_inventory.items():
+            user_inventory_dict.setdefault(u_piece.piece_id, [])
+            user_inventory_dict[u_piece.piece_id].append((u_piece.color_id, quantity))
+
+        for s_piece, s_quantity in self.required_pieces.items():
+            piece_id = s_piece.piece_id
+            required_pieces_dict.setdefault(piece_id, set())
+
+            if piece_id in user_inventory_dict:
+                for user_color, user_quantity in user_inventory_dict[piece_id]:
+                    if user_quantity >= s_quantity:
+                        required_pieces_dict[piece_id].add(user_color)
+
+        for colors in required_pieces_dict.values():
+            if not colors:
+                return False
+
+        print(Set.has_unique_color_assignment(required_pieces_dict))
+        return Set.has_unique_color_assignment(required_pieces_dict)

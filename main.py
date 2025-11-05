@@ -13,7 +13,7 @@ def print_list(item_list):
 
 def main():
     api = ApiDataHandler(BASE_URL)
-    username = "brickfan35"
+    username = "dr_crocodile"
     task = 1
     if task == 1:
         user = api.get_user_by_username(username)
@@ -32,6 +32,10 @@ def main():
     if task == 3:
         threshold = 0.5
         # largest_collection_of_pieces(api, username, threshold)
+    if task == 4:
+        user = api.get_user_by_username(username)
+        all_sets = api.get_all_sets()
+        user.find_buildable_sets_no_color(all_sets)
 
 if __name__ == "__main__":
     main()
