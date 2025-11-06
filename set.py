@@ -7,6 +7,9 @@ class Set:
         self.total_pieces = total_pieces
         self.required_pieces = required_pieces  # dictionary of piece --> quantity
 
+    def __repr__(self):
+        return self.name
+
     def can_build(self, user) -> bool:
         """
         Check if this set can be built with the user's pieces.

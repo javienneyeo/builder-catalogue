@@ -3,6 +3,10 @@ from user import User
 from set import Set
 from piece import Piece
 
+class ApiError(Exception):
+    """Custom exception for API-related issues."""
+    pass
+
 class ApiDataHandler:
     def __init__(self, base_url: str):
         self.base_url = base_url
@@ -14,20 +18,15 @@ class ApiDataHandler:
             response.raise_for_status()
             return response.json()
         except requests.exceptions.Timeout:
-            print(f"Timeout error: The request to {url} took too long to respond.")
-            return None
+            raise ApiError(f"Timeout error: The request to {url} took too long to respond.")
         except requests.exceptions.ConnectionError:
-            print(f"Connection error: Unable to connect to {url}.")
-            return None
+            raise ApiError(f"Connection error: Unable to connect to {url}.")
         except requests.exceptions.HTTPError as http_err:
-            print(f"HTTP error {response.status_code} when accessing {url}: {http_err}")
-            return None
+            raise ApiError(f"HTTP error {response.status_code} when accessing {url}: {http_err}")
         except requests.exceptions.RequestException as req_err:
-            print(f"Request exception occurred for {url}: {req_err}")
-            return None
+            raise ApiError(f"Request exception occurred for {url}: {req_err}")
         except ValueError as json_err:
-            print(f"JSON decoding failed for {url}: {json_err}")
-            return None
+            raise ApiError(f"JSON decoding failed for {url}: {json_err}")
 
     def get_all_users(self) -> list[User]:
         users_list = self._get_json("/api/users")
@@ -45,6 +44,7 @@ class ApiDataHandler:
 
     def get_user_by_username(self, username: str) -> User:
         data = self._get_json(f"/api/user/by-username/{username}")
+
         user_id = data['id']
         brick_count = data['brickCount']
         user_data = self._get_json(f"/api/user/by-id/{user_id}")
