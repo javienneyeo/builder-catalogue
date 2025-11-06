@@ -17,7 +17,8 @@ class CliHandler:
         print("3. Find buildable sets")
         print("4. Find collaborators to build a set")
         print("5. Find buildable sets without following color")
-        print("6. Exit")
+        print("6. Find pieces needed to build a set")
+        print("7. Exit")
         choice = input(f"[{username}]: ")
         return choice
     
@@ -39,8 +40,8 @@ class CliHandler:
             for item in item_list:
                 print(f"- {item}")
         else:
-            print("No items found")
+            print("<< No items found >>")
 
     def print_hello(self, username):
         print()
-        print("Hello {username}!")
+        print(f"Hello {username}!")

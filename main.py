@@ -66,6 +66,11 @@ def main():
             user.find_buildable_sets_no_color(all_sets)
 
         elif choice == "6":
+            target = ask_for_valid_set(cli, api, all_sets)
+            missing_pieces = user.find_missing_pieces(target.required_pieces)
+            cli.print_list(missing_pieces)
+
+        elif choice == "7":
             cli.print_output(f"Bye {user.username}! Hope to see you again :-)")
             break
 
