@@ -7,6 +7,9 @@ class User:
         self.brick_count = brick_count
         self.inventory = inventory  # dictionary of piece --> quantity
 
+    def __repr__(self):
+        return self.username
+
     def find_missing_pieces(self, set_pieces_dict):
         missing_pieces = {}
         for piece, set_quantity in set_pieces_dict.items():
