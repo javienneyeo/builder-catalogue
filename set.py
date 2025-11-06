@@ -19,6 +19,17 @@ class Set:
                 return False
         return True
     
+    def buildable_percentage(self, user):
+        total_required_pieces = 0
+        missing_pieces = 0
+        for piece, quantity in self.required_pieces.items():
+            total_required_pieces += quantity
+            user_quantity = user.inventory.get(piece, 0)
+            if user_quantity < quantity:
+                missing_pieces += (quantity - user_quantity)
+        built_pieces = total_required_pieces - missing_pieces
+        return (built_pieces/total_required_pieces) * 100
+    
     def required_pieces_without_color(self):
         pieces_without_color = {}
         for piece, quantity in self.required_pieces.items():

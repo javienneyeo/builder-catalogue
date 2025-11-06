@@ -4,7 +4,7 @@ class CliHandler:
 
     def get_input(self, prompt):
         print()
-        return input(f"[bobby] {prompt} ")
+        return input(f"[bobby]: {prompt} ")
     
     def print_divider(self):
         print("=========================================")
@@ -18,7 +18,8 @@ class CliHandler:
         print("4. Find collaborators to build a set")
         print("5. Find buildable sets without following color")
         print("6. Find pieces needed to build a set")
-        print("7. Exit")
+        print("7. How much of a set can I build") 
+        print("8. Exit")
         choice = input(f"[{username}]: ")
         return choice
     
@@ -43,5 +44,4 @@ class CliHandler:
             print("<< No items found >>")
 
     def print_hello(self, username):
-        print()
-        print(f"Hello {username}!")
+        self.print_output(f"Hello {username}!")
