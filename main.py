@@ -63,7 +63,9 @@ def main():
             cli.print_list(collaborators)
 
         elif choice == "5":
-            user.find_buildable_sets_no_color(all_sets)
+            buildable_sets_any_color = user.find_buildable_sets_no_color(all_sets)
+            cli.print_output("You can build these sets")
+            cli.print_list(buildable_sets_any_color)
 
         elif choice == "6":
             target = ask_for_valid_set(cli, api, all_sets)
@@ -75,6 +77,7 @@ def main():
             target = ask_for_valid_set(cli, api, all_sets)
             percentage = target.buildable_percentage(user)
             cli.print_output(f"You can build {percentage}% of {target.name}")
+
         elif choice == "8":
             cli.print_output(f"Bye {user.username}! Hope to see you again :-)")
             break

@@ -2,207 +2,174 @@ import pytest
 from set import Set
 from piece import Piece
 
-class MockUser:
-    def __init__(self, inventory):
-        # inventory is a dict of Piece -> quantity
-        self.inventory = inventory
 
-def test_can_build_true_when_user_has_all_pieces():
-    """User has all required pieces in sufficient quantities."""
-    pieces_needed = {
+@pytest.fixture
+def simple_set():
+    required = {
         Piece("3023", "blue"): 2,
-        Piece("4286", "red"): 1,
+        Piece("3001", "red"): 1,
     }
-    set_obj = Set(101, "Mini Car", 3, pieces_needed)
+    return Set(1, "SimpleSet", 3, required)
 
-    user_inventory = {
-        Piece("3023", "blue"): 3,  # has more than needed
-        Piece("4286", "red"): 1,
-        Piece("3001", "green"): 5,  # irrelevant extra piece
-    }
-    user = MockUser(user_inventory)
 
-    assert set_obj.can_build(user) is True
-
-def test_can_build_false_when_missing_piece():
-    """User missing one required piece."""
-    pieces_needed = {
+@pytest.fixture
+def simple_user_inventory():
+    return {
         Piece("3023", "blue"): 2,
-        Piece("4286", "red"): 1,
+        Piece("3001", "red"): 1,
     }
-    set_obj = Set(101, "Mini Car", 3, pieces_needed)
 
-    user_inventory = {
-        Piece("3023", "blue"): 2,
-        # Missing the red one
+
+def test_repr(simple_set):
+    assert repr(simple_set) == "SimpleSet"
+
+
+def test_can_build_true(simple_set, simple_user_inventory):
+    class User:
+        inventory = simple_user_inventory
+    assert simple_set.can_build(User()) is True
+
+
+def test_can_build_false(simple_set):
+    class User:
+        inventory = {
+            Piece("3023", "blue"): 1,  # not enough
+            Piece("3001", "red"): 1,
+        }
+    assert simple_set.can_build(User()) is False
+
+
+def test_buildable_percentage_100(simple_set, simple_user_inventory):
+    class User:
+        inventory = simple_user_inventory
+    assert simple_set.buildable_percentage(User()) == 100.0
+
+
+def test_buildable_percentage_partial(simple_set):
+    class User:
+        inventory = {
+            Piece("3023", "blue"): 1,  # missing 1
+            Piece("3001", "red"): 1,
+        }
+    # total = 3, built = 2 → 66.666%
+    assert simple_set.buildable_percentage(User()) == pytest.approx(66.666, rel=0.01)
+
+
+def test_required_pieces_without_color(simple_set):
+    result = simple_set.required_pieces_without_color()
+    assert result == {
+        "3023": 2,
+        "3001": 1,
     }
-    user = MockUser(user_inventory)
 
-    assert set_obj.can_build(user) is False
 
-def test_can_build_false_when_not_enough_quantity():
-    """User has the piece but not enough quantity."""
-    pieces_needed = {
-        Piece("3023", "blue"): 4,
-        Piece("4286", "red"): 2,
+def test_unique_assignment_simple_true():
+    piece_colors = {
+        "3023": {"blue", "red"},
+        "3001": {"yellow"},
     }
-    set_obj = Set(101, "Mini Car", 6, pieces_needed)
+    assert Set.has_unique_color_assignment(piece_colors) is True
 
-    user_inventory = {
-        Piece("3023", "blue"): 3,  # less than needed
-        Piece("4286", "red"): 2,
+
+def test_unique_assignment_same_piece_id_reuse():
+    piece_colors = {
+        "3023": {"blue"},
     }
-    user = MockUser(user_inventory)
+    assert Set.has_unique_color_assignment(piece_colors) is True
 
-    assert set_obj.can_build(user) is False
 
-def test_can_build_true_with_empty_required_pieces():
-    """If no pieces are required, user should always be able to build."""
-    set_obj = Set(102, "Empty Set", 0, {})
-    user = MockUser({})  # Empty inventory
-    assert set_obj.can_build(user) is True
+def test_unique_assignment_conflict_false():
+    piece_colors = {
+        "3023": {"blue"},
+        "3001": {"blue"},  # conflict
+    }
+    assert Set.has_unique_color_assignment(piece_colors) is False
 
-def test_can_build_false_with_empty_user_inventory():
-    """User cannot build if they have no pieces but the set requires some."""
-    pieces_needed = {
+
+def test_unique_assignment_complex_valid():
+    piece_colors = {
+        "3023": {"blue", "red"},
+        "3001": {"red", "green"}
+    }
+    assert Set.has_unique_color_assignment(piece_colors) is True
+
+
+def test_unique_assignment_empty():
+    assert Set.has_unique_color_assignment({}) is True
+
+
+def test_is_buildable_any_color_true():
+    required = {
         Piece("3023", "blue"): 1,
-    }
-    set_obj = Set(103, "Simple Build", 1, pieces_needed)
-    user = MockUser({})
-    assert set_obj.can_build(user) is False
-
-def test_buildable_any_color_true_with_unique_colors():
-    """User can build set when each piece has at least one unique color option."""
-    pieces_needed = {
         Piece("3001", "red"): 1,
-        Piece("3002", "blue"): 1,
-        Piece("3003", "green"): 1
     }
-    set_obj = Set(201, "Rainbow Car", 3, pieces_needed)
+    s = Set(10, "ColorSet", 2, required)
 
     user_inventory = {
-        Piece("3001", "yellow"): 2,
-        Piece("3002", "purple"): 1,
-        Piece("3003", "orange"): 1
+        Piece("3023", "yellow"): 5,  # blue -> yellow
+        Piece("3001", "green"): 5,   # red  -> green
     }
-    user = MockUser(user_inventory)
 
-    assert set_obj.is_buildable_any_color(user.inventory) is True
+    assert s.is_buildable_any_color(user_inventory) is True
 
 
-def test_buildable_any_color_false_with_color_conflicts():
-    """User has pieces but all share the same color, violating uniqueness."""
-    pieces_needed = {
+def test_is_buildable_any_color_quantity_too_low():
+    required = {
+        Piece("3023", "blue"): 4,
+    }
+    s = Set(10, "ColorSet", 4, required)
+
+    user_inventory = {
+        Piece("3023", "yellow"): 3,  # not enough quantity
+    }
+
+    assert s.is_buildable_any_color(user_inventory) is False
+
+
+def test_is_buildable_any_color_conflict():
+    required = {
+        Piece("3023", "blue"): 1,
         Piece("3001", "red"): 1,
-        Piece("3002", "blue"): 1,
-        Piece("3003", "green"): 1
     }
-    set_obj = Set(202, "Monochrome House", 3, pieces_needed)
+    s = Set(10, "ConflictSet", 2, required)
 
     user_inventory = {
-        Piece("3001", "black"): 2,
-        Piece("3002", "black"): 2,
-        Piece("3003", "black"): 2
+        Piece("3023", "yellow"): 5,
+        Piece("3001", "yellow"): 5,  # conflict: both map to yellow
     }
-    user = MockUser(user_inventory)
 
-    assert set_obj.is_buildable_any_color(user.inventory) is False
+    assert s.is_buildable_any_color(user_inventory) is False
 
 
-def test_buildable_any_color_false_with_insufficient_quantity():
-    """User lacks sufficient quantity for a required piece, even with color flexibility."""
-    pieces_needed = {
-        Piece("3001", "red"): 2,
-        Piece("3002", "blue"): 1
+def test_is_buildable_any_color_reuse_same_piece_id():
+    required = {
+        Piece("3023", "blue"): 2,
     }
-    set_obj = Set(203, "Short Supply", 3, pieces_needed)
+    s = Set(10, "ReuseSet", 2, required)
 
     user_inventory = {
-        Piece("3001", "yellow"): 1,  # not enough
-        Piece("3002", "green"): 2
+        Piece("3023", "yellow"): 10,  # same piece_id → same color allowed
     }
-    user = MockUser(user_inventory)
 
-    assert set_obj.is_buildable_any_color(user.inventory) is False
+    assert s.is_buildable_any_color(user_inventory) is True
 
-def test_buildable_any_color_partial_overlap():
-    """
-    User has overlapping color options:
-      piece 1: ['1']
-      piece 2: ['2', '3']
-      piece 3: ['1', '2']
-    Expected: True (e.g., assign 1→piece1, 3→piece2, 2→piece3)
-    """
-    pieces_needed = {
-        Piece("p1", "red"): 1,
-        Piece("p2", "blue"): 1,
-        Piece("p3", "green"): 1
+
+def test_is_buildable_any_color_complex_valid():
+    required = {
+        Piece("3023", "blue"): 1,
+        Piece("3001", "red"): 1,
+        Piece("2456", "green"): 1,
     }
-    set_obj = Set(204, "Overlap Color Set", 3, pieces_needed)
+    s = Set(10, "ComplexSet", 3, required)
 
     user_inventory = {
-        Piece("p1", "1"): 1,       # only color '1'
-        Piece("p2", "3"): 1,
-        Piece("p2", "2"): 1,       # two options for p2
-        Piece("p3", "1"): 1,
-        Piece("p3", "2"): 1        # two options for p3
-    }
-    user = MockUser(user_inventory)
-
-    assert set_obj.is_buildable_any_color(user.inventory) is True
-
-def test_is_buildable_any_color_true_simple():
-    # --- User inventory ---
-    user_inventory = {
-        Piece("p1", "red"): 2,
-        Piece("p2", "blue"): 1,
-        Piece("p2", "green"): 3,
-        Piece("p3", "yellow"): 1,
-        Piece("p3", "red"): 2,
+        Piece("3023", "yellow"): 5,
+        Piece("3001", "blue"): 5,
+        Piece("2456", "red"): 5,
     }
 
-    # --- Required pieces ---
-    required_pieces = {
-        Piece("p1", "red"): 1,
-        Piece("p2", "green"): 1,
-        Piece("p3", "yellow"): 1,
-    }
-
-    lego_set = Set(1, "Color Flex Test", 3, required_pieces)
-
-    # should return True (has enough of all, colors don't clash)
-    assert lego_set.is_buildable_any_color(user_inventory) is True
-
-def test_is_buildable_any_color_false_conflict():
-    user_inventory = {
-        Piece("p1", "red"): 1,
-        Piece("p2", "red"): 1,
-    }
-
-    required_pieces = {
-        Piece("p1", "blue"): 1,
-        Piece("p2", "yellow"): 1,
-    }
-
-    lego_set = Set(3, "Conflict Test", 2, required_pieces)
-
-    # Both pieces only have "red" available → cannot assign unique colors
-    assert lego_set.is_buildable_any_color(user_inventory) is False
-
-
-def test_is_buildable_any_color_false_missing_piece():
-    user_inventory = {
-        Piece("p1", "red"): 1,
-        Piece("p2", "blue"): 1,
-    }
-
-    required_pieces = {
-        Piece("p1", "red"): 1,
-        Piece("p2", "blue"): 1,
-        Piece("p3", "green"): 1,  # user doesn't have piece3
-    }
-
-    lego_set = Set(4, "Missing Piece Test", 3, required_pieces)
-
-    # Missing one piece entirely
-    assert lego_set.is_buildable_any_color(user_inventory) is False
+    # Valid mapping:
+    # blue  -> yellow
+    # red   -> blue
+    # green -> red
+    assert s.is_buildable_any_color(user_inventory) is True

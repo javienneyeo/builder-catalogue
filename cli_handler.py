@@ -7,7 +7,7 @@ class CliHandler:
         return input(f"[bobby]: {prompt} ")
     
     def print_divider(self):
-        print("=========================================")
+        print("=============================================")
 
     def print_guide(self, username):
         self.print_output("What would you like to do today?")

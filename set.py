@@ -11,9 +11,6 @@ class Set:
         return self.name
 
     def can_build(self, user) -> bool:
-        """
-        Check if this set can be built with the user's pieces.
-        """
         for piece, quantity in self.required_pieces.items():
             if user.inventory.get(piece, 0) < quantity:
                 return False
@@ -30,31 +27,26 @@ class Set:
         built_pieces = total_required_pieces - missing_pieces
         return (built_pieces/total_required_pieces) * 100
     
-    def required_pieces_without_color(self):
-        pieces_without_color = {}
-        for piece, quantity in self.required_pieces.items():
-            piece_id = piece.piece_id
-            pieces_without_color[piece_id] = pieces_without_color.get(piece_id, 0) + quantity
-        return pieces_without_color
-    
     @staticmethod
-    def has_unique_color_assignment(piece_colors, used_colors=None):
-        if used_colors is None:
-            used_colors = set()
-
+    def has_unique_color_assignment(piece_colors, used_colors_by_piece_id=None):
+        if used_colors_by_piece_id is None:
+            used_colors_by_piece_id = {}
         if not piece_colors:
             return True
 
         piece_id, colors = next(iter(piece_colors.items()))
-
         for color in colors:
-            if color not in used_colors:
-                new_used = used_colors | {color}
-                remaining = {k: v for k, v in piece_colors.items() if k != piece_id}
-                if Set.has_unique_color_assignment(remaining, new_used):
-                    return True
+            if color in used_colors_by_piece_id.values():
+                continue
 
+            new_assignments = used_colors_by_piece_id.copy()
+            new_assignments[piece_id] = color
+
+            remaining = {k: v for k, v in piece_colors.items() if k != piece_id}
+            if Set.has_unique_color_assignment(remaining, new_assignments):
+                return True
         return False
+
 
     def is_buildable_any_color(self, user_inventory):
         required_pieces_dict = {}
@@ -67,7 +59,6 @@ class Set:
         for s_piece, s_quantity in self.required_pieces.items():
             piece_id = s_piece.piece_id
             required_pieces_dict.setdefault(piece_id, set())
-
             if piece_id in user_inventory_dict:
                 for user_color, user_quantity in user_inventory_dict[piece_id]:
                     if user_quantity >= s_quantity:
@@ -76,6 +67,7 @@ class Set:
         for colors in required_pieces_dict.values():
             if not colors:
                 return False
-
-        print(Set.has_unique_color_assignment(required_pieces_dict))
         return Set.has_unique_color_assignment(required_pieces_dict)
+    
+    
+

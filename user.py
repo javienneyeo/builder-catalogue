@@ -55,21 +55,14 @@ class User:
         if not missing_pieces:
             return collaborators
         return []
-
-    def get_inventory_without_color(self):
-        inventory_without_color = {}
-        for piece, quantity in self.inventory.items():
-            piece_id = piece.piece_id
-            inventory_without_color[piece_id] = inventory_without_color.get(piece_id, 0) + quantity
-        return inventory_without_color
             
     def find_buildable_sets_no_color(self, all_sets):
         buildable_sets = self.find_buildable_sets(all_sets)
         new_buildable_sets = []
         for s in all_sets:
-            # if s.name not in buildable_sets:
-            if s.is_buildable_any_color(self.inventory):
-                new_buildable_sets.append(s.name)
+            if s.name not in buildable_sets:
+                if s.is_buildable_any_color(self.inventory):
+                    new_buildable_sets.append(s.name)
         return new_buildable_sets
 
 

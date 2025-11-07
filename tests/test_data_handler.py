@@ -1,149 +1,208 @@
 import pytest
 from unittest.mock import patch, MagicMock
-from data_handler import ApiDataHandler
+from data_handler import ApiDataHandler, ApiError
 from user import User
 from set import Set
 from piece import Piece
 import requests
 
-@pytest.fixture
-def api_handler():
-    return ApiDataHandler("https://fake-api.com")
+def make_response(json_data, status=200):
+    mock_resp = MagicMock()
+    mock_resp.status_code = status
+    mock_resp.json.return_value = json_data
+    mock_resp.raise_for_status.return_value = None
+    return mock_resp
+
 
 @patch("data_handler.requests.get")
-def test_get_json_success(mock_get, api_handler):
-    """Test _get_json returns parsed JSON on success."""
-    mock_response = MagicMock()
-    mock_response.status_code = 200
-    mock_response.json.return_value = {"ok": True}
-    mock_response.raise_for_status.return_value = None
-    mock_get.return_value = mock_response
+def test_get_json_success(mock_get):
+    mock_get.return_value = make_response({"ok": True})
 
-    result = api_handler._get_json("/api/test")
+    api = ApiDataHandler("https://fake.com")
+    result = api._get_json("/test")
+
     assert result == {"ok": True}
-    mock_get.assert_called_once_with("https://fake-api.com/api/test")
+    mock_get.assert_called_once_with("https://fake.com/test")
+
 
 @patch("data_handler.requests.get")
-def test_get_json_http_error(mock_get, api_handler, capsys):
-    """Test handling of HTTP error."""
-    mock_response = MagicMock()
-    mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError("HTTP Error")
-    mock_get.return_value = mock_response
+def test_get_json_http_error(mock_get):
+    mock_resp = MagicMock()
+    mock_resp.raise_for_status.side_effect = requests.exceptions.HTTPError()
+    mock_resp.status_code = 404
+    mock_get.return_value = mock_resp
 
-    result = api_handler._get_json("/api/error")
-    captured = capsys.readouterr()
+    api = ApiDataHandler("https://fake.com")
 
-    assert result is None
-    assert "HTTP error" in captured.out or "Request exception" in captured.out
+    with pytest.raises(ApiError):
+        api._get_json("/bad")
+
 
 @patch("data_handler.requests.get")
-def test_get_json_connection_error(mock_get, api_handler, capsys):
-    """Test handling of connection error."""
-    mock_get.side_effect = requests.exceptions.ConnectionError("Connection error")
+def test_get_json_connection_error(mock_get):
+    mock_get.side_effect = requests.exceptions.ConnectionError()
 
-    result = api_handler._get_json("/api/users")
-    captured = capsys.readouterr()
+    api = ApiDataHandler("https://fake.com")
 
-    assert result is None
-    assert "Connection error" in captured.out or "Request exception" in captured.out
+    with pytest.raises(ApiError):
+        api._get_json("/fail")
 
-@patch.object(ApiDataHandler, "_get_json")
-def test_get_all_users(mock_get_json, api_handler):
-    """Test that get_all_users returns list of User objects."""
-    mock_get_json.side_effect = [
-        # Response 1: list of users
-        {"Users": [{"id": 1, "username": "brickfan35", "brickCount": 6}]},
-        # Response 2: user by ID
-        {
-            "collection": [
-                {"pieceId": "3023", "variants": [{"color": "blue", "count": 4}]},
-                {"pieceId": "4286", "variants": [{"color": "red", "count": 2}]},
-            ]
-        },
-    ]
 
-    users = api_handler.get_all_users()
+@patch("data_handler.requests.get")
+def test_get_json_timeout(mock_get):
+    mock_get.side_effect = requests.exceptions.Timeout()
+
+    api = ApiDataHandler("https://fake.com")
+
+    with pytest.raises(ApiError):
+        api._get_json("/timeout")
+
+
+@patch("data_handler.requests.get")
+def test_get_all_users(mock_get):
+    """
+    ORDER OF CALLS:
+    1. /api/users
+    2. /api/user/by-id/1
+    """
+
+    # 1. Mock /api/users
+    mock_users = make_response({
+        "Users": [
+            {"id": 1, "username": "dr_crocodile", "brickCount": 42}
+        ]
+    })
+
+    # 2. Mock /api/user/by-id/1
+    mock_user_data = make_response({
+        "collection": [
+            {
+                "pieceId": "3023",
+                "variants": [
+                    {"color": "blue", "count": 4}
+                ]
+            }
+        ]
+    })
+
+    mock_get.side_effect = [mock_users, mock_user_data]
+
+    api = ApiDataHandler("https://fake.com")
+    users = api.get_all_users()
+
     assert len(users) == 1
     user = users[0]
+
     assert isinstance(user, User)
-    assert user.username == "brickfan35"
-    assert len(user.inventory) == 2
+    assert user.username == "dr_crocodile"
+    assert user.brick_count == 42
 
-    pieces = list(user.inventory.keys())
-    assert all(isinstance(p, Piece) for p in pieces)
-    assert user.inventory[Piece("3023", "blue")] == 4
-    assert user.inventory[Piece("4286", "red")] == 2
+    # Check inventory
+    piece = Piece("3023", "blue")
+    assert user.inventory[piece] == 4
 
-@patch.object(ApiDataHandler, "_get_json")
-def test_get_user_by_username(mock_get_json, api_handler):
-    """Test that get_user_by_username returns a User object."""
-    mock_get_json.side_effect = [
-        # Response 1: user summary
-        {"id": 1, "username": "brickfan35", "brickCount": 6},
-        # Response 2: user full data
-        {
-            "collection": [
-                {"pieceId": "3023", "variants": [{"color": "blue", "count": 4}]},
-                {"pieceId": "4286", "variants": [{"color": "red", "count": 2}]},
-            ]
-        },
-    ]
 
-    user = api_handler.get_user_by_username("brickfan35")
+@patch("data_handler.requests.get")
+def test_get_user_by_username(mock_get):
+    """
+    ORDER OF CALLS:
+    1. /api/user/by-username/...
+    2. /api/user/by-id/...
+    """
+
+    summary = make_response({
+        "id": 5,
+        "username": "bricklover",
+        "brickCount": 99
+    })
+
+    full_user = make_response({
+        "collection": [
+            {
+                "pieceId": "3001",
+                "variants": [{"color": "red", "count": 12}]
+            }
+        ]
+    })
+
+    mock_get.side_effect = [summary, full_user]
+
+    api = ApiDataHandler("https://fake.com")
+    user = api.get_user_by_username("bricklover")
+
     assert isinstance(user, User)
-    assert user.username == "brickfan35"
-    assert len(user.inventory) == 2
-    assert user.inventory[Piece("3023", "blue")] == 4
-    assert user.inventory[Piece("4286", "red")] == 2
+    assert user.user_id == 5
+    assert user.username == "bricklover"
+    assert user.brick_count == 99
 
-@patch.object(ApiDataHandler, "_get_json")
-def test_get_all_sets(mock_get_json, api_handler):
-    """Test that get_all_sets returns list of Set objects."""
-    mock_get_json.side_effect = [
-        # Response 1: list of sets
-        {"Sets": [{"id": 101, "name": "Tropical Island"}]},
-        # Response 2: set by ID
-        {
-            "id": 101,
-            "name": "Tropical Island",
-            "totalPieces": 6,
-            "pieces": [
-                {"part": {"designID": "3023", "material": "blue"}, "quantity": 4},
-                {"part": {"designID": "4286", "material": "red"}, "quantity": 2},
-            ],
-        },
-    ]
+    assert user.inventory[Piece("3001", "red")] == 12
 
-    sets = api_handler.get_all_sets()
+
+@patch("data_handler.requests.get")
+def test_get_all_sets(mock_get):
+
+    # /api/sets
+    sets_list = make_response({
+        "Sets": [
+            {"id": 100, "name": "Cool Castle", "totalPieces": 3}
+        ]
+    })
+
+    # /api/set/by-id/100
+    set_full = make_response({
+        "id": 100,
+        "name": "Cool Castle",
+        "totalPieces": 3,
+        "pieces": [
+            {"part": {"designID": "3023", "material": "blue"}, "quantity": 2},
+            {"part": {"designID": "3001", "material": "red"}, "quantity": 1}
+        ]
+    })
+
+    mock_get.side_effect = [sets_list, set_full]
+
+    api = ApiDataHandler("https://fake.com")
+
+    sets = api.get_all_sets()
     assert len(sets) == 1
-    l_set = sets[0]
-    assert isinstance(l_set, Set)
-    assert l_set.name == "Tropical Island"
-    assert len(l_set.required_pieces) == 2
-    assert l_set.required_pieces[Piece("3023", "blue")] == 4
-    assert l_set.required_pieces[Piece("4286", "red")] == 2
 
-@patch.object(ApiDataHandler, "_get_json")
-def test_get_set_by_set_name(mock_get_json, api_handler):
-    """Test that get_set_by_set_name returns a Set object."""
-    mock_get_json.side_effect = [
-        # Response 1: set summary
-        {"id": 101, "name": "Tropical Island", "totalPieces": 6},
-        # Response 2: full set details
-        {
-            "id": 101,
-            "name": "Tropical Island",
-            "totalPieces": 6,
-            "pieces": [
-                {"part": {"designID": "3023", "material": "blue"}, "quantity": 4},
-                {"part": {"designID": "4286", "material": "red"}, "quantity": 2},
-            ],
-        },
-    ]
+    s = sets[0]
+    assert isinstance(s, Set)
+    assert s.name == "Cool Castle"
 
-    l_set = api_handler.get_set_by_set_name("Tropical Island")
-    assert isinstance(l_set, Set)
-    assert l_set.name == "Tropical Island"
-    assert len(l_set.required_pieces) == 2
-    assert l_set.required_pieces[Piece("3023", "blue")] == 4
-    assert l_set.required_pieces[Piece("4286", "red")] == 2
+    assert s.required_pieces[Piece("3023", "blue")] == 2
+    assert s.required_pieces[Piece("3001", "red")] == 1
+
+
+@patch("data_handler.requests.get")
+def test_get_set_by_set_name(mock_get):
+
+    # 1. summary call
+    summary = make_response({
+        "id": 200,
+        "name": "Mega Tower",
+        "totalPieces": 5
+    })
+
+    # 2. full details call
+    full = make_response({
+        "id": 200,
+        "name": "Mega Tower",
+        "totalPieces": 5,
+        "pieces": [
+            {"part": {"designID": "3069", "material": "black"}, "quantity": 3},
+            {"part": {"designID": "3003", "material": "yellow"}, "quantity": 2}
+        ]
+    })
+
+    mock_get.side_effect = [summary, full]
+
+    api = ApiDataHandler("https://fake.com")
+
+    s = api.get_set_by_set_name("Mega Tower")
+
+    assert isinstance(s, Set)
+    assert s.name == "Mega Tower"
+
+    assert s.required_pieces[Piece("3069", "black")] == 3
+    assert s.required_pieces[Piece("3003", "yellow")] == 2
