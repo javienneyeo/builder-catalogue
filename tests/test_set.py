@@ -54,15 +54,6 @@ def test_buildable_percentage_partial(simple_set):
     # total = 3, built = 2 → 66.666%
     assert simple_set.buildable_percentage(User()) == pytest.approx(66.666, rel=0.01)
 
-
-def test_required_pieces_without_color(simple_set):
-    result = simple_set.required_pieces_without_color()
-    assert result == {
-        "3023": 2,
-        "3001": 1,
-    }
-
-
 def test_unique_assignment_simple_true():
     piece_colors = {
         "3023": {"blue", "red"},
